@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+<style>
+
+	#info {
+  position: absolute;
+  top: 0px;
+  width: 100%;
+  padding: 10px;
+  text-align: center;
+  color: #ffff00
+}
+#gui {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+ //   height: 350px;
+}
+body {
+  overflow: hidden;
+}
+
+
+
+</style>
+</head>
+
+<body> 
+<script src="https://threejs.org/build/three.min.js"></script>
+<script src="https://threejs.org/examples/js/controls/OrbitControls.js">
+</script>
+<script src="https://raw.githack.com/mrdoob/three.js/dev/examples/js/misc/Gyroscope.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.5/dat.gui.min.js"></script>
+<script src="https://raw.githack.com/mrdoob/three.js/dev/examples/js/loaders/MTLLoader.js"></script>
+<script src="https://raw.githack.com/mrdoob/three.js/dev/examples/js/loaders/OBJLoader.js"></script>
+
+<audio id="BGM" autoplay loop style="display:none">
+<source src="GPHW/bgm.mp3"  type='audio/mp3'>
+</audio>
+	
+<script>
+
+class Footprint_right {
+
+	constructor(mesh,pz,opacity) {
+		
+		this.mesh = mesh;
+		
+		scene.add (this.mesh);
+		
+		this.mesh.material.opacity = opacity;	
+	}
+	
+	update(dt) {
+	
+		this.mesh.material.opacity -= 0.03;
+		if (this.mesh.material.opacity < 0)
+		
+			scene.remove(this.mesh);
+			
+	}
+}
+
+class Footprint_left {
+
+	constructor(mesh,pz,opacity) {
+		
+		this.mesh = mesh;
+		
+		scene.add (this.mesh);
+		
+		this.mesh.material.opacity = opacity;	
+	}
+	
+	update(dt) {
+	
+		this.mesh.material.opacity -= 0.03;
+		
+		if (this.mesh.material.opacity < 0)
+			
+			scene.remove(this.mesh);	
+	}
+}
+
+
+var camera1,scene, renderer;
+var gyro;
+var useGyro = true;
+var pointLight;
+var k = 10;
+var opc = 0.5;
+var head, arm, rightArm, torso, leg, rightLeg,mine,gun;
+var angle = 0;
+var gcontrol;
+var Minecraft = new THREE.Object3D();
+var modelName = "minecraft";
+var num = 0;
+var dt = 0.1;
+var rightFoot = [];
+var leftFoot = [];
+var opacity = 3;
+var timeRight = 0, timeLeft = 0;
+
+////////////////////
+var theta1 = 0,
+  theta2 = 0;
+var pose1 = {
+theta1: .5,
+  theta2: -.8
+}
+var pose2 = {
+theta1: -.3,
+  theta2: .4
+}
+var pose3 = {
+theta1: -.8,
+  theta2: .2
+}
+var pose4 = {
+theta1: -.8,
+  theta2: .8
+}
+
+var keys = [
+  [0, pose1],
+  [0.2, pose4],
+  [0.4, pose1],
+  [0.6, pose2],
+  [0.8, pose3],
+  [1, pose1]
+];
+var T = 240/112;
+var clock = new THREE.Clock();
+var ts = clock.getElapsedTime();  // start time
+var intKey = [];
+
+
+
+///////////////
+init();
+animate();
+makeFloor();
+function init() {
+
+	bgm = document.getElementById ('BGM');
+	bgm.play();
+
+  scene = new THREE.Scene();
+
+  renderer = new THREE.WebGLRenderer();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setClearColor(0x888888);
+  document.body.appendChild(renderer.domElement);
+  
+  camera1 = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 1, 1000);
+  camera1.position.set(0,250,300);
+  let controls1 = new THREE.OrbitControls(camera1, renderer.domElement);
+
+  ////////////////////////////////////////////////////////////////
+  var gridXZ = new THREE.GridHelper(200, 20, 'red', 'white');
+  //scene.add(gridXZ);
+  
+  pointLight = new THREE.PointLight (0xffffff);
+  pointLight.position.set (0,0,0);
+  scene.add (pointLight);
+  
+  scene.add (new THREE.PointLightHelper (pointLight,5))
+  
+////////////////
+mine = new THREE.Group();
+head = makeHead();
+  torso = makeTorso();
+mine.add (head, torso);
+  head.position.y = 7.57*k;
+  torso.position.y = 4.09*k;
+ 
+  arm = makeArm();
+  mine.add (arm);
+  arm.position.set (1.26*k+0.62*k, 7.57*k, 0);
+  scene.add (mine);
+ 
+  rightArm = makeRightArm();
+  rightArm.position.set(-1.26*k-0.62*k,7.57*k,0);
+  mine.add(rightArm);
+ 
+  leg = makeLeg();
+  leg.position.set (0.63*k, 4.09*k, 0);
+  mine.add (leg);
+ 
+  rightLeg = makeRightLeg();
+  rightLeg.position.set (-0.63*k, 4.09*k, 0);
+  mine.add (rightLeg);
+  mine.add (Minecraft);
+
+  arm.rotation.z = -Math.PI/2;
+  rightArm.rotation.z = Math.PI/2;
+  leg.rotation.z = -Math.PI/2;
+  rightLeg.rotation.z = Math.PI/2;
+ 
+  arm.rotation.order = 'ZYX';
+  leg.rotation.order = 'ZYX';
+  rightArm.rotation.order = 'ZYX';
+  rightLeg.rotation.order = 'ZYX';
+  /////////////////////
+  gcontrol = {
+    theta1: 0.01,
+    theta2: 0.01,
+  };
+
+  var gui = new dat.GUI({load:loadJSON(), preset:'key1'});
+  gui.domElement.id = 'gui';
+
+gui.remember (gcontrol);
+ 
+  gui.add(gcontrol, 'theta1', -0.8, 0.5);
+  gui.add(gcontrol, 'theta2', -0.8, 0.8);
+  
+  readModel('minecraft',40);
+  
+  gyro = new THREE.Gyroscope();
+  scene.add (gyro)
+  gyro.add (camera1);
+  mine.add(gyro);
+	
+}
+
+function makeFloor(){
+
+	let loader = new THREE.TextureLoader()
+	let texture = loader.load('https://i.imgur.com/VtUmuvx.jpg')
+	let bg = new THREE.Mesh(new THREE.BoxGeometry(1000,1500,1000), 
+		new THREE.MeshBasicMaterial({ map:texture, side:THREE.DoubleSide}));
+	scene.add(bg);
+	
+	textureG = loader.load('https://i.imgur.com/mLfjWse.png');
+	var planeGeometry = new THREE.PlaneGeometry(1000,1000 )
+	var planeMaterial = new THREE.MeshBasicMaterial({map:textureG , side: THREE.DoubleSide} )
+	
+	
+	let plane = new THREE.Mesh(planeGeometry, planeMaterial)
+	plane.rotation.x = Math.PI/2;
+	scene.add(plane);
+}
+
+function buildRightFootPrint(num,angle) {
+	
+	var loader = new THREE.TextureLoader();
+	tex = loader.load ('https://i.imgur.com/9NApvcW.png');
+	
+
+	let mesh = new THREE.Mesh (new THREE.PlaneGeometry (50,50), 
+	new THREE.MeshBasicMaterial({map: tex, alphaTest:0.5, transparent: true}));
+	
+	mesh.position.set (210*Math.cos(angle), 1e-2, -210*Math.sin(angle));
+	
+	mesh.rotation.z = angle;
+	mesh.rotation.x = -Math.PI/2;
+
+	rightFoot.push( new Footprint_right(mesh.clone(),num,opacity));
+}
+
+function buildLeftFootPrint(num,angle) {
+	
+	var loader = new THREE.TextureLoader();
+	tex = loader.load ('https://i.imgur.com/JB2XIXX.png');
+  
+
+	let mesh = new THREE.Mesh (new THREE.PlaneGeometry (50,50), 
+	new THREE.MeshBasicMaterial({map: tex, alphaTest:0.5, transparent: true}));
+	
+	mesh.position.set (190*Math.cos(angle), 1e-2, -190*Math.sin(angle));
+	
+	mesh.rotation.z = angle;
+	mesh.rotation.x = -Math.PI/2;
+
+	leftFoot.push( new Footprint_left(mesh.clone(),num,opacity));
+}
+
+function makeArm() {
+
+const ArmMap = new THREE.TextureLoader().load('https://i.imgur.com/B3merIi.png');
+const skinMap = new THREE.TextureLoader().load('https://i.imgur.com/6VutYlO.png');
+const ArmMaterials = [];
+
+var group = new THREE.Group();
+
+for(let i = 0; i < 6 ; i++){
+let map;
+  if(i == 0)map = skinMap;
+  else if(i == 1)map = skinMap;
+  else map = ArmMap;
+  ArmMaterials.push(new THREE.MeshBasicMaterial({map : map}));
+}
+
+  var body = new THREE.Mesh (new THREE.BoxGeometry(3.82*k, 1.24*k, 1.24*k), ArmMaterials);
+ 
+group.add (body);
+  body.position.x = 3.82*k/2;
+ 
+return group;
+
+
+}
+
+function makeRightArm() {
+
+const RightArmMap = new THREE.TextureLoader().load('https://i.imgur.com/B3merIi.png');
+const skinMap = new THREE.TextureLoader().load('https://i.imgur.com/6VutYlO.png');
+const RightArmMaterials = [];
+
+var group = new THREE.Group();
+
+for(let i = 0; i < 6 ; i++){
+let map;
+  if(i == 0)map = skinMap;
+  else if(i == 1)map = skinMap;
+  else map = RightArmMap;
+  RightArmMaterials.push(new THREE.MeshBasicMaterial({map : map}));
+}
+var body = new THREE.Mesh (new THREE.BoxGeometry(-3.82*k, 1.24*-k, 1.24*k), RightArmMaterials);
+ 
+group.add (body);
+  body.position.x = -3.82*k/2;
+return group;
+
+
+}
+
+function makeLeg() {
+
+const legMap = new THREE.TextureLoader().load('https://i.imgur.com/GtWJ3YD.png');
+const skinMap = new THREE.TextureLoader().load('https://i.imgur.com/hGKPS8T.png');
+const legMaterials = [];
+
+for(let i = 0; i < 6 ; i++){
+let map;
+  if(i == 0)map = skinMap;
+  else if(i == 1)map = skinMap;
+  else map = legMap;
+  legMaterials.push(new THREE.MeshBasicMaterial({map : map}));
+}
+
+var group = new THREE.Group();
+  var body = new THREE.Mesh (new THREE.BoxGeometry(4.09*k, 1.26*k, 1.26*k), legMaterials);
+ 
+group.add (body);
+  body.position.x = 4.09*k/2;
+return group;
+
+
+}
+
+function makeRightLeg() {
+
+const rightLegMap = new THREE.TextureLoader().load('https://i.imgur.com/GtWJ3YD.png');
+const skinMap = new THREE.TextureLoader().load('https://i.imgur.com/hGKPS8T.png');
+const rightLegMaterials = [];
+
+for(let i = 0; i < 6 ; i++){
+let map;
+  if(i == 0)map = skinMap;
+  else if(i == 1)map = skinMap;
+  else map = rightLegMap;
+  rightLegMaterials.push(new THREE.MeshBasicMaterial({map : map}));
+}
+
+var group = new THREE.Group();
+  var body = new THREE.Mesh (new THREE.BoxGeometry(-4.09*k, 1.26*-k, 1.26*k), rightLegMaterials);
+ 
+group.add (body);
+  body.position.x = -4.09*k/2;
+return group;
+
+
+}
+
+
+
+function makeHead() {
+const headMap = new THREE.TextureLoader().load('https://i.imgur.com/De83efy.png');
+const rightHeadMap = new THREE.TextureLoader().load('https://i.imgur.com/ooeGUUr.png');
+const leftHeadMap = new THREE.TextureLoader().load('https://i.imgur.com/JcNVUKp.png');
+const skinMap = new THREE.TextureLoader().load('https://i.imgur.com/sSC9DFD.png');
+const headMaterials = [];
+
+var headGroup = new THREE.Group();
+
+for(let i = 0; i < 6 ; i++){
+let map;
+  if(i == 5) map = headMap;
+  else if(i == 0)map = rightHeadMap;
+  else if(i == 1)map = leftHeadMap;
+  else map = skinMap;
+  headMaterials.push(new THREE.MeshBasicMaterial({map : map}));
+}
+  var headBody = new THREE.Mesh (new THREE.BoxGeometry(2.52*k, 2.52*k, 2.52*k), headMaterials);
+ 
+headGroup.add (headBody);
+  headBody.position.y = 2.52*k/2;
+return headGroup;
+}
+
+function makeTorso () {
+
+const torsoFrontMap = new THREE.TextureLoader().load('https://i.imgur.com/lJOQ3Vd.png');
+const skinMap = new THREE.TextureLoader().load('https://i.imgur.com/ciebB53.png');
+const TorsoMaterials = [];
+
+for(let i = 0; i < 6 ; i++){
+let map;
+  if(i == 5)map = torsoFrontMap;
+  else map = skinMap;
+  TorsoMaterials.push(new THREE.MeshBasicMaterial({map : map}));
+}
+
+var group = new THREE.Group();
+var body = new THREE.Mesh (new THREE.BoxGeometry(2.52*k, 3.48*k, 1.26*k), TorsoMaterials);
+ 
+group.add (body);
+  body.position.y = 3.48*k/2;
+return group;
+
+}
+
+function readModel (modelName, targetSize = 20) {
+
+	var onProgress = function(xhr) {
+		if (xhr.lengthComputable) {
+			var percentComplete = xhr.loaded / xhr.total * 100;
+			console.log(Math.round(percentComplete, 2) + '% downloaded');
+			}
+		};
+
+	var onError = function(xhr) {};
+
+	var mtlLoader = new THREE.MTLLoader();
+	mtlLoader.setPath('model/');
+	mtlLoader.load(modelName+'.mtl', function(materials) {
+
+		materials.preload();
+
+		var objLoader = new THREE.OBJLoader();
+		objLoader.setMaterials(materials);
+		objLoader.setPath('model/');
+		objLoader.load(modelName+'.obj', function(object) {
+		
+			Minecraft.add (unitize (object, 100));
+			Minecraft.position.set(0,50,0);
+			//theObject.add ( new THREE.BoxHelper (theObject) )
+			//theObject.name = 'OBJ'
+			scene.add (Minecraft);
+			//theObject.position.set(0,0,0);
+			//theObject.setRotationFromEuler (new THREE.Euler (3.1416/2, 0, -3.1416/2, 'ZYX'))
+
+		}, onProgress, onError);
+
+	});
+}
+
+function unitize (object, targetSize) {  
+	
+	// find bounding box of 'object'
+	var box3 = new THREE.Box3();
+	box3.setFromObject (object);
+	var size = new THREE.Vector3();
+	size.subVectors (box3.max, box3.min);
+	var center = new THREE.Vector3();
+	center.addVectors(box3.max, box3.min).multiplyScalar (0.5);
+	
+	console.log ('center: ' + center.x + ', '+center.y + ', '+center.z );
+	console.log ('size: ' + size.x + ', ' +  size.y + ', '+size.z );
+	
+	// uniform scaling according to objSize
+	var objSize = Math.max (size.x, size.y, size.z);
+	var scaleSet = targetSize/objSize;
+				
+	var theObject =  new THREE.Object3D();
+	theObject.add (object);
+	object.scale.set (scaleSet, scaleSet, scaleSet);
+	object.position.set (-center.x*scaleSet, -center.y*scaleSet, -center.z*scaleSet);
+	//theObject.rotation.y = -Math.PI/8;
+	return theObject;
+			
+}
+
+
+function keyframe(t) {
+  var s = ((t - ts) % T) / T;
+
+  for (var i = 1; i < keys.length; i++) {
+    if (keys[i][0] > s) break;
+  }
+  // take i-1
+  var ii = i - 1;
+  var a = (s - keys[ii][0]) / (keys[ii + 1][0] - keys[ii][0]);
+  intKey = [keys[ii][1].theta1 * (1 - a) + keys[ii + 1][1].theta1 * a,
+            keys[ii][1].theta2 * (1 - a) + keys[ii + 1][1].theta2 * a,
+  ];
+
+}
+
+function animate() {
+
+  pointLight.position.set (40*Math.cos(angle), 60, 40*Math.sin(angle));
+  arm.rotation.y = intKey[0]//gcontrol.theta1; //Math.PI/4;
+  rightArm.rotation.y = intKey[0]
+  leg.rotation.y = intKey[1]//gcontrol.theta2;//-Math.PI/4;
+  rightLeg.rotation.y = intKey[1]
+  angle += 0.01;
+  mine.rotation.y = angle;
+  //Minecraft.rotation.y = angle;
+  
+  var t = clock.getDelta ();
+	
+	timeRight += t;
+	if(timeRight > 1){
+		buildLeftFootPrint(num,angle);
+		num += 50;
+		timeRight = 0;
+	}
+	
+	timeLeft += t;
+	if(timeLeft >= 1){
+		buildRightFootPrint(num,angle);
+		num += 50;
+		timeLeft = 0;
+	}
+	
+	rightFoot.forEach(function (b){b.update (dt)});
+	leftFoot.forEach(function (b){b.update (dt)});
+	
+  keyframe(clock.getElapsedTime())
+  mine.position.set(200 * Math.cos(angle),0,-200 * Math.sin(angle) );
+  Minecraft.position.set(-30+ 90 * Math.cos(angle),70,-90 * Math.sin(angle) );
+  
+  camera1.lookAt (mine.position)
+  
+  requestAnimationFrame(animate);
+  render();
+
+}
+
+function loadJSON() {
+return {
+  "preset": "key1",
+  "remembered": {
+    "Default": {
+      "0": {
+        "theta1": 0.01,
+        "theta2": 0.01
+      }
+    },
+    "key2": {
+      "0": {
+        "theta1": 0.5,
+        "theta2": -0.8
+      }
+    },
+    "key3": {
+      "0": {
+        "theta1": -0.8,
+        "theta2": 0.8
+      }
+    }
+  },
+  "closed": false,
+  "folders": {}
+}
+}
+function render() {
+
+  renderer.render(scene, camera1);
+
+}
+
+
+
+</script>
+</body>
+
+</html>

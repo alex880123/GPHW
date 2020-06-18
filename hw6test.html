@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+<style>
+
+	#info {
+  position: absolute;
+  top: 0px;
+  width: 100%;
+  padding: 10px;
+  text-align: center;
+  color: #ffff00
+}
+
+
+body {
+  overflow: hidden;
+}
+
+
+</style>
+</head>
+
+<body> 
+
+<div id="info">minimal three.js</div>
+<script src="https://threejs.org/build/three.min.js"></script>
+<script src="https://threejs.org/examples/js/controls/OrbitControls.js">
+</script>
+
+	
+	
+<script>
+var camera, scene, renderer,controls,scene2;
+
+init();
+animate();
+
+function init() {
+
+  scene = new THREE.Scene();
+  scene2 = new THREE.Scene();
+  renderer = new THREE.WebGLRenderer();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setClearColor(0x888888);
+  document.body.appendChild(renderer.domElement);
+
+  camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 1, 1000);
+  camera.position.z = 500;
+
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
+  //controls.autoRotate = true;
+  ////////////////////////////////////////////////////////////////
+  var gridXZ = new THREE.GridHelper(200, 20, 'red', 'white');
+  //scene.add(gridXZ);
+//////////////////////////////////////////////////////////////////  
+  let loaderBaby = new THREE.TextureLoader();
+  loaderBaby.crossOrigin = '';
+  texture = loaderBaby.load('https://i.imgur.com/EKGyRBF.png');
+
+  var texMat = new THREE.MeshBasicMaterial({
+    map: texture,
+    //transparent: true
+    alphaTest: 0.5
+  });
+
+	baby = new THREE.Mesh(new THREE.PlaneGeometry(40, 80), texMat);
+	baby.position.set(-50,-150,50);
+	scene2.add(baby);
+/////////////////////////////////////////////////////////////////////
+
+let loaderMe = new THREE.TextureLoader();
+  loaderMe.crossOrigin = '';
+  texture = loaderMe.load('https://i.imgur.com/kabAspW.png');
+
+  var texMat = new THREE.MeshBasicMaterial({
+    map: texture,
+    //transparent: true
+    alphaTest: 0.5
+  });
+
+	me = new THREE.Mesh(new THREE.PlaneGeometry(50, 50), texMat);
+	me.position.set(50,-150,50);
+	scene2.add(me);
+//////////////////////////////////////////////////////////////////////////
+let loaderBackGround = new THREE.TextureLoader();
+  loaderBackGround.crossOrigin = '';
+  texture = loaderBackGround.load('https://i.imgur.com/VrnIW0u.png');
+
+	// Plane with default texture coordinates [0,1]x[0,1]
+  var texMat = new THREE.MeshBasicMaterial( { 
+		map: texture,
+        alpha:0.5,
+		transparent: true,
+		side: THREE.DoubleSide
+	} );
+ bG = new THREE.Mesh( new THREE.PlaneGeometry(500, 500), texMat );
+  bG .position.set(0,0,-100);
+  scene.add(bG);	
+///////////////////////////////////////////////////////////////////////////
+var textGeometry = new THREE.PlaneGeometry(100,100);
+let loaderText = new THREE.TextureLoader();
+    texture = loaderText.load( 'https://i.imgur.com/398vAAq.png' );
+    let textMaterial = new THREE.MeshBasicMaterial( { 
+		map: texture,
+        alpha:0.5,
+		transparent: true,
+		side: THREE.DoubleSide
+	} );
+    let textMesh	= new THREE.Mesh( textGeometry, textMaterial );
+    textMesh.position.set(70,-100,50);
+    //wordmesh.rotation.x = -Math.PI/2;
+    scene2.add (textMesh);
+
+}
+
+function animate() {
+
+  controls.update();
+  baby.lookAt (camera.position)
+  requestAnimationFrame(animate);
+  render();
+
+}
+
+function render() {
+	renderer.autoClear = false;
+	
+	renderer.clear();                     // clear buffers
+	renderer.render( scene, camera );     // render scene 1
+	renderer.clearDepth();                // clear depth buffer
+	renderer.render( scene2, camera );    // render scene 2
+	
+
+}
+
+
+
+
+</script>
+</body>
+
+</html>

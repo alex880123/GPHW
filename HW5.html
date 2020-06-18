@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+<style>
+
+	#info {
+  position: absolute;
+  top: 0px;
+  width: 100%;
+  padding: 10px;
+  text-align: center;
+  color: #ffff00
+}
+
+body {
+  overflow: hidden
+}
+
+
+</style>
+</head>
+
+<body> 
+
+<div id="info">Agent (Seek, Arrival, Collision)</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/107/three.min.js"></script>
+<script src="https://threejs.org/examples/js/controls/OrbitControls.js">
+
+
+</script>
+
+	
+	
+<script>
+class Obstacle {
+	constructor (center,size) {
+		this.center = center.clone();  
+		this.mesh = new THREE.Mesh (new THREE.CylinderGeometry(size,size,1,20),
+			new THREE.MeshBasicMaterial());
+		this.mesh.position.copy (center);
+		this.size = size;
+    scene.add (this.mesh)
+	}
+}
+
+class Agent {
+  constructor(pos, mesh) {
+    this.pos = pos.clone();
+    this.vel = new THREE.Vector3();
+    this.force = new THREE.Vector3();
+    this.target = new THREE.Vector3();
+    this.size = 3;  // half width
+    this.mesh = mesh;
+    this.MAXSPEED = 50;
+    this.ARRIVAL_R = 30;
+    //this.nbhd = [];
+    
+    // for orientable agent
+    this.angle = 0;
+  }
+  update(dt) {
+    this.accumulateForce();
+//    this.vel.add(this.force.clone().multiplyScalar(dt));
+    console.log(this.pos);
+	// collision
+	let vhat = this.vel.clone().normalize();
+	let point = ob.center.clone().sub (this.pos) // c-p
+	let proj  = point.dot(vhat);
+const REACH = 50
+const K = 10
+	if (proj > -50 && proj < REACH) {
+		let perp = new THREE.Vector3();
+		perp.subVectors (point, vhat.clone().setLength(proj));
+		let overlap = ob.size + this.size - perp.length()
+    if (overlap > 0 ) {
+			perp.setLength (K*overlap);
+			perp.negate()
+      this.force.add (perp);
+			console.log ("hit:", perp);
+		}
+	}
+  
+  this.vel.add(this.force.clone().multiplyScalar(dt));
+
+    
+    // velocity modulation
+    let diff = this.target.clone().sub(this.pos)
+    let dst = diff.length();
+    if (dst < this.ARRIVAL_R) {
+      this.vel.setLength(dst)
+    }
+    
+    
+    this.pos.add(this.vel.clone().multiplyScalar(dt))
+    this.mesh.position.copy(this.pos)
+    
+    // for orientable agent
+    // non PD version
+    if (this.vel.length() > 0.1) {
+	    	this.angle = Math.atan2 (-this.vel.z, this.vel.x)
+    		this.mesh.rotation.y = this.angle
+   	}
+  }
+
+  setTarget(target) {
+    this.target.copy(target)
+  }
+  targetInducedForce(targetPos) {
+    return targetPos.clone().sub(this.pos).normalize().multiplyScalar(this.MAXSPEED).sub(this.vel)
+  }
+
+  accumulateForce() {
+    // seek
+    this.force.copy(this.targetInducedForce(this.target));
+  }
+
+}
+
+
+////////////////////
+var camera, scene, renderer;
+var puck;
+
+var raycaster;
+var mouse = new THREE.Vector2();
+var pickables = [];
+var ob
+
+
+init();
+animate();
+
+function agentMesh () {
+	// mesh facing +x
+	let geometry = new THREE.Geometry();
+  geometry.vertices.push (new THREE.Vector3(10,0,0))
+  geometry.vertices.push (new THREE.Vector3(0,0,-3))
+  geometry.vertices.push (new THREE.Vector3(0,0,3))
+  geometry.vertices.push (new THREE.Vector3(0,3,0))
+  
+  geometry.faces.push(new THREE.Face3(0, 3, 2));
+  geometry.faces.push(new THREE.Face3(0, 2, 1));
+  geometry.faces.push(new THREE.Face3(1, 3, 0));
+  geometry.faces.push(new THREE.Face3(1, 2, 3));
+	geometry.computeFaceNormals()
+	return new THREE.Mesh (geometry, 
+  //new THREE.MeshNormalMaterial());
+  new THREE.MeshBasicMaterial({color:'cyan', wireframe:true}))  
+}
+
+function init() {
+
+  scene = new THREE.Scene();
+/*
+	var loader = new THREE.TextureLoader();
+  loader.setCrossOrigin("")
+  tex = loader.load ("https://i.imgur.com/HBZ38p5.jpg")
+  scene.background (tex)
+*/  
+  camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 1, 1000);
+  camera.position.z = 500;
+
+  var gridXZ = new THREE.GridHelper(240, 24, 'red', 'white');
+  scene.add(gridXZ);
+
+  renderer = new THREE.WebGLRenderer();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setClearColor(0x888888);
+
+  let controls = new THREE.OrbitControls(camera, renderer.domElement);
+
+  document.body.appendChild(renderer.domElement);
+
+  /////////////////////////////////////////////////////////////////////
+  plane = new THREE.Mesh(new THREE.PlaneGeometry(240, 240), new THREE.MeshBasicMaterial({
+    transparent: true,
+    opacity: 0.5,
+    visible: true
+  }));
+  scene.add(plane);
+  //plane.material.visible = false
+  plane.rotation.x = -Math.PI / 2;
+  pickables = [plane];
+
+	let loader = new THREE.TextureLoader();
+  loader.crossOrigin = ""
+  let tex = loader.load ("https://i.imgur.com/GmthNU8.png");
+  target = new THREE.Mesh(new THREE.CircleGeometry(10,20), new THREE.MeshBasicMaterial({
+    map: tex,
+    transparent:true
+	 }));
+  scene.add(target);
+  target.rotation.x = -Math.PI/2
+
+//  tex2 = loader.load ("https://i.imgur.com/HBZ38p5.jpg")
+//  scene.background = tex2
+
+	raycaster = new THREE.Raycaster();
+  document.addEventListener('mousedown', onDocumentMouseDown, false);
+  ////////////////////////
+		let mesh = agentMesh ();
+		let mesh1 = agentMesh ();
+    agent = new Agent(new THREE.Vector3(-100 + 200 * Math.random(), 0, -100 + 200 * Math.random()), mesh);
+	agent1 = new Agent(new THREE.Vector3(-100 + 200 * Math.random(), 0, -100 + 200 * Math.random()), mesh1);
+    scene.add(mesh)
+	scene.add(mesh1)
+  
+//    pdControl = new PDControllerR2();
+
+	ob = new Obstacle (new THREE.Vector3(50,0,50), 20)
+}
+
+function onDocumentMouseDown(event) {
+
+  event.preventDefault();
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+  // find intersections
+  raycaster.setFromCamera(mouse, camera);
+  var intersects = raycaster.intersectObjects(pickables);
+  if (intersects.length > 0) {
+    target.position.copy(intersects[0].point);
+    target.position.y = 0.15
+    agent.setTarget(intersects[0].point)
+	agent1.setTarget(intersects[0].point)
+  }
+
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  render();
+
+	agent.update(0.01)
+	agent1.update(0.01)
+}
+
+function render() {
+  renderer.render(scene, camera);
+}
+
+
+
+
+
+</script>
+</body>
+
+</html>

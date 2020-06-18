@@ -1,0 +1,30 @@
+var theta1 = 0,
+  theta2 = 0;
+var pose1 = {
+theta1: .5,
+  theta2: -.8
+}
+var pose2 = {
+theta1: -.3,
+  theta2: .4
+}
+var pose3 = {
+theta1: -.8,
+  theta2: .2
+}
+var pose4 = {
+theta1: -.8,
+  theta2: .8
+}
+
+var keys = [
+  [0, pose1],
+  [0.2, pose4],
+  [0.4, pose1],
+  [0.6, pose2],
+  [0.8, pose3],
+  [1, pose1]
+]; 
+分6步驟:
+1->4正常走一步
+1->2->3墊一步
